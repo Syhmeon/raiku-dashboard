@@ -138,7 +138,7 @@ body {
     <div class="subtitle">Epoch-level economic data &bull; 785 epochs &bull; 2021-02-10 to 2026-03-03</div>
   </div>
   <div class="meta">
-    Generated 2026-03-04 10:42<br>
+    Generated 2026-03-04 10:48<br>
     Sources: Dune Analytics, CoinGecko
   </div>
 </div>
@@ -238,8 +238,45 @@ body {
 
 </div>
 
+<!-- Estimation info box -->
+<div class="container">
+  <div style="background:#1c1f2e;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:24px;">
+    <h3 style="color:#fbbf24;font-size:14px;margin-bottom:10px;">&#9888;&#65039; About estimated values (dashed lines)</h3>
+    <p style="font-size:13px;color:#8b949e;line-height:1.6;">
+      <strong style="color:#e1e4e8;">APY &amp; Total Staked</strong> data from Dune Analytics is unavailable for epochs 800+ (since ~June 2025)
+      because the underlying <code style="color:#a78bfa">active_stake</code> field is missing from the source query.<br><br>
+      <strong style="color:#e1e4e8;">How we estimate:</strong><br>
+      &bull; <strong>APY</strong>: Using <code style="color:#a78bfa">annualized_inflation / baseline_active_stake</code> where baseline = avg of last 20 known epochs (~410.6M SOL).<br>
+      &bull; <strong>Total Staked</strong>: Using <code style="color:#a78bfa">CoinGecko total_supply &times; staked_ratio</code> (independent source, ~72% ratio from last known epochs).<br><br>
+      Solid lines = real data &bull; Dashed lines = estimated &bull;
+      <span style="color:#f87171;">These estimates assume a stable staked ratio and may diverge from reality over time.</span>
+    </p>
+  </div>
+</div>
+
+<!-- Raw Data Table -->
+<div class="container">
+  <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:20px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 style="font-size:14px;color:#f0f6fc;margin:0;">
+        &#128202; Raw Data Table
+        <span style="font-size:11px;color:#8b949e;font-weight:400;margin-left:8px;" id="tableInfo"></span>
+      </h3>
+      <button onclick="toggleTable()" id="tableToggle"
+        style="background:#7c3aed;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">
+        Show Data
+      </button>
+    </div>
+    <div id="dataTableWrap" style="display:none;overflow-x:auto;max-height:500px;overflow-y:auto;">
+      <table id="dataTable" style="width:100%;border-collapse:collapse;font-size:12px;font-family:monospace;">
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="footer">
   RAIKU &mdash; Solana Economics Database &bull; Data: Dune Analytics (queries 6773409, 6773227) + CoinGecko API
+  &bull; <a href="https://github.com/Syhmeon/raiku-dashboard" style="color:#7c3aed;">GitHub</a>
 </div>
 
 <script>
@@ -289,6 +326,7 @@ function filterData(from, to) {
   document.getElementById('rangeDisplay').textContent =
     `Epoch ${from} — ${to} (${filtered.length} epochs)`;
   updateAllCharts();
+  if (tableVisible) buildTable();
 }
 
 function applyRange() {
@@ -428,11 +466,11 @@ function updateAllCharts() {
        backgroundColor: 'rgba(45,212,191,0.08)', fill: true },
   ], { yFormat: fmtPct });
 
-  // 6. Validator count
+  // 6. Validator count — use plain numbers for readability
   buildChart('valChart', 'line', [
     { label: 'Validators', data: filtered.map(d => d.validators), borderColor: COLORS.blue,
        backgroundColor: COLORS.blueA, fill: true },
-  ], { yFormat: v => fmtK(v) });
+  ], { yFormat: v => v.toLocaleString() });
 
   // 7. Total rewards USD
   buildChart('usdChart', 'bar', [
@@ -451,8 +489,62 @@ function updateAllCharts() {
   ], { yFormat: v => fmtK(v) + ' SOL' });
 }
 
-// Init
-applyRange();
+// ============================================================
+// DATA TABLE
+// ============================================================
+
+let tableVisible = false;
+function toggleTable() {
+  tableVisible = !tableVisible;
+  document.getElementById('dataTableWrap').style.display = tableVisible ? 'block' : 'none';
+  document.getElementById('tableToggle').textContent = tableVisible ? 'Hide Data' : 'Show Data';
+  if (tableVisible) buildTable();
+}
+
+function buildTable() {
+  const cols = [
+    ['epoch','Epoch'], ['date','Date'], ['inf','Inflation (SOL)'], ['fee','Fee (SOL)'],
+    ['mev','MEV (SOL)'], ['total','Total (SOL)'], ['total_usd','Total (USD)'],
+    ['issue_apy','Issue APY %'], ['fee_apy','Fee APY %'], ['total_apy','Total APY %'],
+    ['price','Price (USD)'], ['validators','Validators'], ['comm_rate','Commission %'],
+    ['total_stake','Staked (SOL)'], ['est','Est.']
+  ];
+  let html = '<thead><tr>';
+  cols.forEach(([k,label]) => {
+    html += `<th style="position:sticky;top:0;background:#0d1117;padding:8px 6px;text-align:right;color:#8b949e;border-bottom:2px solid #30363d;white-space:nowrap;">${label}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  // Show filtered data (same as charts)
+  const data = [...filtered].reverse();  // newest first
+  data.forEach(d => {
+    const bg = d.est ? 'rgba(251,191,36,0.05)' : 'transparent';
+    html += `<tr style="background:${bg};border-bottom:1px solid #21262d;">`;
+    cols.forEach(([k]) => {
+      let v = d[k];
+      let style = 'padding:6px;text-align:right;color:#e1e4e8;white-space:nowrap;';
+      if (v === null || v === undefined) { html += `<td style="${style}color:#484f58;">—</td>`; return; }
+      if (k === 'date') style += 'text-align:left;';
+      if (k === 'est') { v = v ? '⚡' : ''; style += 'text-align:center;'; }
+      else if (k === 'total_usd') v = '$' + Math.round(v).toLocaleString();
+      else if (k === 'price') v = '$' + v.toFixed(2);
+      else if (k.includes('apy') || k === 'comm_rate') v = v.toFixed(2) + '%';
+      else if (k === 'total_stake') v = Math.round(v).toLocaleString();
+      else if (typeof v === 'number' && !Number.isInteger(v)) v = v.toLocaleString(undefined, {maximumFractionDigits:1});
+      else if (typeof v === 'number') v = v.toLocaleString();
+      html += `<td style="${style}">${v}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('dataTable').innerHTML = html;
+  document.getElementById('tableInfo').textContent = `${filtered.length} epochs (newest first)`;
+}
+
+// Init — delay to ensure DOM is fully laid out (fixes crushed scales on first load)
+window.addEventListener('load', () => {
+  requestAnimationFrame(() => applyRange());
+});
 </script>
 </body>
 </html>

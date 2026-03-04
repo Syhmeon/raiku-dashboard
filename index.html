@@ -143,7 +143,7 @@ body {
     <div class="subtitle">Epoch-level data &bull; 785 epochs &bull; 2021-02-10 to 2026-03-03 &bull; All observed data, zero estimates</div>
   </div>
   <div class="meta">
-    Generated 2026-03-04 11:39<br>
+    Generated 2026-03-04 12:07<br>
     Sources: Dune Analytics, CoinGecko
   </div>
 </div>
@@ -461,6 +461,26 @@ function fmtK(v) { return v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6)
 function fmtPct(v) { return v.toFixed(1) + '%'; }
 function fmtUSD(v) { return '$' + fmtK(v); }
 
+function showPending(chartId, msg) {
+  const canvas = document.getElementById(chartId);
+  if (!canvas) return;
+  const wrap = canvas.parentElement;
+  let badge = wrap.querySelector('.pending-badge');
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.className = 'pending-badge';
+    badge.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(124,58,237,0.15);border:1px solid #7c3aed;border-radius:8px;padding:8px 16px;font-size:11px;color:#a78bfa;text-align:center;pointer-events:none;z-index:10;';
+    wrap.appendChild(badge);
+  }
+  badge.textContent = msg;
+}
+function clearPending(chartId) {
+  const canvas = document.getElementById(chartId);
+  if (!canvas) return;
+  const badge = canvas.parentElement.querySelector('.pending-badge');
+  if (badge) badge.remove();
+}
+
 // ============================================================
 // UPDATE ALL CHARTS
 // ============================================================
@@ -550,12 +570,15 @@ function updateAllCharts() {
          borderColor: C.orange, backgroundColor: C.orangeA, fill: true },
     ], { yFormat: fmtPct });
   } else {
-    // No fee breakdown — show placeholder
+    // No fee breakdown — show fee reward + pending notice
     buildChart('feeCompChart', 'line', [
       { label: 'Fee Reward (to validators)', data: filtered.map(d => d.fee),
          borderColor: C.orange, backgroundColor: C.orangeA, fill: true },
     ], { yFormat: v => fmtK(v) + ' SOL' });
     buildChart('priorityPctChart', 'line', [], {});
+    // Show pending notices
+    showPending('feeCompChart', 'Base vs priority breakdown: Dune query still computing');
+    showPending('priorityPctChart', 'Awaiting fee breakdown data from Dune');
   }
 
   // Fee share of total rewards
@@ -585,6 +608,23 @@ function updateAllCharts() {
     { label: 'Burned (SOL)', data: filtered.map(d => d.burned),
        backgroundColor: C.redA, borderColor: C.red, borderWidth: 1 },
   ], { yFormat: v => fmtK(v) + ' SOL' });
+
+  // Clear or show pending notices on burn/net_inf charts
+  const burnedCount = filtered.filter(d => d.burned !== null).length;
+  clearPending('burnChart'); clearPending('netInflationChart');
+  if (burnedCount === 0) {
+    showPending('burnChart', 'Burned fees: requires fee breakdown data (pre-SIMD96 only for now)');
+    showPending('netInflationChart', 'Net inflation: requires burned fee data');
+  } else if (burnedCount < filtered.length * 0.5) {
+    showPending('burnChart', `Partial data: ${burnedCount}/${filtered.length} epochs (pre-SIMD96 only)`);
+    showPending('netInflationChart', `Partial data: ${burnedCount}/${filtered.length} epochs (pre-SIMD96 only)`);
+  }
+
+  // Clear fee pending notices if breakdown available
+  if (HAS_FEE_BREAKDOWN) {
+    clearPending('feeCompChart');
+    clearPending('priorityPctChart');
+  }
 }
 
 // ============================================================
@@ -600,7 +640,7 @@ function toggleTable() {
 }
 
 function buildTable() {
-  const cols = [
+  const allCols = [
     ['epoch','Epoch'], ['date','Date'], ['inf','Inflation (SOL)'], ['fee','Fee Reward (SOL)'],
     ['mev','MEV (SOL)'], ['total','Total (SOL)'], ['total_usd','Total (USD)'],
     ['base_fee','Base Fee (SOL)'], ['priority_fee','Priority Fee (SOL)'],
@@ -611,6 +651,8 @@ function buildTable() {
     ['price','Price ($)'], ['validators','Validators'], ['comm_rate','Commission %'],
     ['voting','Commission (SOL)'], ['stake_accounts','Stake Accts']
   ];
+  // Only keep columns that have at least one non-null value in filtered range
+  const cols = allCols.filter(([k]) => filtered.some(d => d[k] !== null && d[k] !== undefined));
   let html = '<thead><tr>';
   cols.forEach(([,label]) => {
     html += `<th style="position:sticky;top:0;background:#0d1117;padding:6px 4px;text-align:right;color:#8b949e;border-bottom:2px solid #30363d;white-space:nowrap;font-size:10px;">${label}</th>`;
@@ -636,7 +678,7 @@ function buildTable() {
   });
   html += '</tbody>';
   document.getElementById('dataTable').innerHTML = html;
-  document.getElementById('tableInfo').textContent = `${filtered.length} epochs (newest first)`;
+  document.getElementById('tableInfo').textContent = `${filtered.length} epochs, ${cols.length} columns (newest first)`;
 }
 
 // Init

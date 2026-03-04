@@ -138,7 +138,7 @@ body {
     <div class="subtitle">Epoch-level economic data &bull; 785 epochs &bull; 2021-02-10 to 2026-03-03</div>
   </div>
   <div class="meta">
-    Generated 2026-03-04 10:39<br>
+    Generated 2026-03-04 10:42<br>
     Sources: Dune Analytics, CoinGecko
   </div>
 </div>
@@ -184,8 +184,8 @@ body {
   <label>Time Range:</label>
   <select id="rangeSelect" onchange="applyRange()">
     <option value="all">All Time</option>
-    <option value="365">Last 365 days</option>
-    <option value="180" selected>Last 180 days</option>
+    <option value="365" selected>Last 365 days</option>
+    <option value="180">Last 180 days</option>
     <option value="90">Last 90 days</option>
     <option value="30">Last 30 days</option>
   </select>
@@ -258,6 +258,7 @@ Chart.defaults.font.size = 11;
 Chart.defaults.elements.point.radius = 0;
 Chart.defaults.elements.point.hoverRadius = 4;
 Chart.defaults.elements.line.borderWidth = 1.5;
+Chart.defaults.elements.line.spanGaps = false;
 Chart.defaults.plugins.legend.labels.boxWidth = 12;
 Chart.defaults.plugins.legend.labels.padding = 12;
 
@@ -376,15 +377,27 @@ function updateAllCharts() {
        backgroundColor: COLORS.greenA, fill: true, order: 1 },
   ], { yFormat: v => fmtK(v) + ' SOL' });
 
-  // 2. APY — split real vs estimated into separate datasets for visual distinction
-  const realAPY = filtered.map(d => d.est ? null : d.issue_apy);
-  const estAPY = filtered.map(d => d.est ? d.issue_apy : null);
-  const realFeeAPY = filtered.map(d => d.est ? null : d.fee_apy);
-  const estFeeAPY = filtered.map(d => d.est ? d.fee_apy : null);
-  const realMevAPY = filtered.map(d => d.est ? null : d.mev_apy);
-  const estMevAPY = filtered.map(d => d.est ? d.mev_apy : null);
-  const realTotalAPY = filtered.map(d => d.est ? null : d.total_apy);
-  const estTotalAPY = filtered.map(d => d.est ? d.total_apy : null);
+  // 2. APY — split real vs estimated with bridge point for continuity
+  // Bridge: include last real point in estimated dataset so lines connect
+  function splitReal(arr, key) {
+    return arr.map(d => d.est ? null : d[key]);
+  }
+  function splitEst(arr, key) {
+    return arr.map((d, i, a) => {
+      if (d.est) return d[key];
+      // Bridge: if next point is estimated, include this real point too
+      if (!d.est && i < a.length - 1 && a[i+1].est) return d[key];
+      return null;
+    });
+  }
+  const realAPY = splitReal(filtered, 'issue_apy');
+  const estAPY = splitEst(filtered, 'issue_apy');
+  const realFeeAPY = splitReal(filtered, 'fee_apy');
+  const estFeeAPY = splitEst(filtered, 'fee_apy');
+  const realMevAPY = splitReal(filtered, 'mev_apy');
+  const estMevAPY = splitEst(filtered, 'mev_apy');
+  const realTotalAPY = splitReal(filtered, 'total_apy');
+  const estTotalAPY = splitEst(filtered, 'total_apy');
 
   buildChart('apyChart', 'line', [
     { label: 'Inflation APY', data: realAPY, borderColor: COLORS.purple },
@@ -427,9 +440,9 @@ function updateAllCharts() {
        backgroundColor: COLORS.purpleA, borderColor: COLORS.purple, borderWidth: 1 },
   ], { yFormat: fmtUSD });
 
-  // 8. Total staked — split real vs estimated
-  const realStake = filtered.map(d => d.est ? null : d.total_stake);
-  const estStake = filtered.map(d => d.est ? d.total_stake : null);
+  // 8. Total staked — split real vs estimated with bridge
+  const realStake = splitReal(filtered, 'total_stake');
+  const estStake = splitEst(filtered, 'total_stake');
   buildChart('stakeChart', 'line', [
     { label: 'Total Staked SOL', data: realStake, borderColor: COLORS.green,
        backgroundColor: COLORS.greenA, fill: true },

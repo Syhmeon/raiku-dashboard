@@ -112,7 +112,9 @@ body {
   padding-bottom: 8px;
   border-bottom: 1px solid #21262d;
 }
-.chart-card canvas { width: 100% !important; }
+.chart-card canvas { width: 100% !important; height: 100% !important; }
+.chart-card .chart-wrap { position: relative; height: 280px; }
+.chart-card.full .chart-wrap { height: 320px; }
 
 /* Footer */
 .footer {
@@ -138,7 +140,7 @@ body {
     <div class="subtitle">Epoch-level economic data &bull; 785 epochs &bull; 2021-02-10 to 2026-03-03</div>
   </div>
   <div class="meta">
-    Generated 2026-03-04 10:48<br>
+    Generated 2026-03-04 10:53<br>
     Sources: Dune Analytics, CoinGecko
   </div>
 </div>
@@ -200,39 +202,39 @@ body {
 <div class="chart-grid">
   <div class="chart-card full">
     <h3>Validator Rewards Breakdown (SOL per Epoch)</h3>
-    <canvas id="rewardsChart" height="80"></canvas>
+    <div class="chart-wrap"><canvas id="rewardsChart"></canvas></div>
   </div>
 
   <div class="chart-card">
     <h3>APY Evolution (%) <span style="font-size:11px;color:#8b949e;font-weight:400">&mdash; dashed = estimated (epochs 800+)</span></h3>
-    <canvas id="apyChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="apyChart"></canvas></div>
   </div>
   <div class="chart-card">
     <h3>SOL Price (USD)</h3>
-    <canvas id="priceChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
   </div>
 
   <div class="chart-card">
     <h3>Fee Share of Total Rewards (%)</h3>
-    <canvas id="feeChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="feeChart"></canvas></div>
   </div>
   <div class="chart-card">
     <h3>Commission Rate (%)</h3>
-    <canvas id="commChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="commChart"></canvas></div>
   </div>
 
   <div class="chart-card">
     <h3>Validator Count</h3>
-    <canvas id="valChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="valChart"></canvas></div>
   </div>
   <div class="chart-card">
     <h3>Total Rewards (USD per Epoch)</h3>
-    <canvas id="usdChart" height="90"></canvas>
+    <div class="chart-wrap"><canvas id="usdChart"></canvas></div>
   </div>
 
   <div class="chart-card full">
     <h3>Total Staked SOL <span style="font-size:11px;color:#8b949e;font-weight:400">&mdash; dashed = estimated (epochs 800+)</span></h3>
-    <canvas id="stakeChart" height="70"></canvas>
+    <div class="chart-wrap"><canvas id="stakeChart"></canvas></div>
   </div>
 </div>
 
@@ -364,7 +366,7 @@ function buildChart(id, type, datasets, opts = {}) {
     data: { labels: makeLabels(), datasets },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         tooltip: {
